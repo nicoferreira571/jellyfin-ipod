@@ -20,7 +20,8 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential fakeroot rsync curl perl git libplist-utils zip unzip xz-utils
+          sudo apt-get install -y build-essential fakeroot rsync curl perl git zip unzip xz-utils
+          sudo apt-get install -y libplist-utils || true
           sudo apt-get install -y ldid || true
           if ! command -v ldid >/dev/null; then
             sudo curl -fL -o /usr/local/bin/ldid https://github.com/ProcursusTeam/ldid/releases/latest/download/ldid_linux_x86_64
