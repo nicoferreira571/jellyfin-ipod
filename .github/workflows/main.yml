@@ -31,3 +31,63 @@ jobs:
       - name: Set up Theos (the iOS build kit)
         run: |
           git clone --recursive --depth=1 https://github.com/theos/theos.git "$HOME/theos"
+          echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
+          mkdir -p "$HOME/theos/toolchain"
+
+          echo "--- looking for the iOS toolchain download ---"
+          gh api repos/L1ghtmann/llvm-project/releases --paginate -q '.[].assets[] | "\(.name) \(.browser_download_url)"' > /tmp/assets.txt || true
+          cat /tmp/assets.txt
+          URL=$(grep -i linux /tmp/assets.txt | grep -iE 'x86_64|amd64|x64' | head -n 1 | cut -d' ' -f2)
+          if [ -z "$URL" ]; then
+            URL=$(grep -i toolchain /tmp/assets.txt | grep -viE 'mac|darwin|arm64|aarch64' | head -n 1 | cut -d' ' -f2)
+          fi
+          echo "Using: $URL"
+          test -n "$URL"
+          curl -fL -o /tmp/toolchain.archive "$URL"
+          tar -xf /tmp/toolchain.archive -C "$HOME/theos/toolchain"
+
+          if [ ! -d "$HOME/theos/toolchain/linux/iphone" ]; then
+            CL=$(find "$HOME/theos/toolchain" -path '*/bin/clang' | head -n 1)
+            echo "clang found at: $CL"
+            test -n "$CL"
+            mkdir -p "$HOME/theos/toolchain/linux"
+            ln -s "$(dirname "$(dirname "$CL")")" "$HOME/theos/toolchain/linux/iphone"
+          fi
+
+          git clone --depth=1 https://github.com/theos/sdks.git /tmp/sdks
+          rm -rf "$HOME/theos/sdks" && mkdir -p "$HOME/theos/sdks"
+          mv /tmp/sdks/*.sdk "$HOME/theos/sdks/"
+          # armv7 needs an older SDK
+          cd "$HOME/theos/sdks" && rm -rf iPhoneOS1[3-9].* iPhoneOS2*.* || true
+          ls "$HOME/theos/sdks"
+          ls "$HOME/theos/toolchain"
+
+      - name: Build the app
+        run: |
+          export THEOS="$HOME/theos"
+          make package FINALPACKAGE=1
+
+      - name: Make the .ipa
+        run: |
+          APP=$(find .theos/_ -type d -name "Jellyfin.app" | head -n 1)
+          echo "Found app at: $APP"
+          test -f "$APP/Jellyfin" && test -f "$APP/index.html" && test -f "$APP/Info.plist"
+          ldid -S "$APP/Jellyfin"
+          rm -rf Payload Jellyfin.ipa
+          mkdir Payload
+          cp -r "$APP" Payload/
+          zip -qr Jellyfin.ipa Payload
+          ls -la Jellyfin.ipa
+
+      - name: Save the .ipa to the Releases page
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Jellyfin build ${{ github.run_number }}
+          files: Jellyfin.ipa
+
+      - name: Also keep it as a download on this run
+        uses: actions/upload-artifact@v4
+        with:
+          name: Jellyfin-ipa
+          path: Jellyfin.ipa
