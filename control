@@ -1,0 +1,8 @@
+Package: com.jfipod.client
+Name: Jellyfin
+Version: 1.0.0
+Architecture: iphoneos-arm
+Description: Dark, modern Jellyfin client for iOS 6
+Maintainer: Jellyfin iPod
+Author: Jellyfin iPod
+Section: Multimedia
