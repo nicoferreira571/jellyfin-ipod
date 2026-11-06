@@ -58,15 +58,21 @@ jobs:
           git clone --depth=1 https://github.com/theos/sdks.git /tmp/sdks
           rm -rf "$HOME/theos/sdks" && mkdir -p "$HOME/theos/sdks"
           mv /tmp/sdks/*.sdk "$HOME/theos/sdks/"
-          # armv7 needs an older SDK
-          cd "$HOME/theos/sdks" && rm -rf iPhoneOS1[3-9].* iPhoneOS2*.* || true
-          ls "$HOME/theos/sdks"
+          cd "$HOME/theos/sdks"
+          echo "SDKs available:"
+          ls
+          # armv7 works best with an older SDK: use 9.x or 10.x if the kit has one
+          if ls iPhoneOS9.*.sdk iPhoneOS10.*.sdk >/dev/null 2>&1; then
+            rm -rf iPhoneOS1[1-9].* iPhoneOS2*.*
+          fi
+          echo "SDKs being used:"
+          ls
           ls "$HOME/theos/toolchain"
 
       - name: Build the app
         run: |
           export THEOS="$HOME/theos"
-          make package FINALPACKAGE=1
+          make package FINALPACKAGE=1 USE_MODULES=0
 
       - name: Make the .ipa
         run: |
