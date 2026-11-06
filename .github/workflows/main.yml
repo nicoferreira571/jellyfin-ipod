@@ -11,6 +11,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Get the code
         uses: actions/checkout@v4
@@ -21,52 +23,11 @@ jobs:
           sudo apt-get install -y build-essential fakeroot rsync curl perl git libplist-utils zip unzip xz-utils
           sudo apt-get install -y ldid || true
           if ! command -v ldid >/dev/null; then
-            sudo curl -L -o /usr/local/bin/ldid https://github.com/ProcursusTeam/ldid/releases/latest/download/ldid_linux_x86_64
+            sudo curl -fL -o /usr/local/bin/ldid https://github.com/ProcursusTeam/ldid/releases/latest/download/ldid_linux_x86_64
             sudo chmod +x /usr/local/bin/ldid
           fi
-          ldid -h 2>&1 | head -1 || true
+          command -v ldid
 
       - name: Set up Theos (the iOS build kit)
         run: |
           git clone --recursive --depth=1 https://github.com/theos/theos.git "$HOME/theos"
-          echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
-          mkdir -p "$HOME/theos/toolchain"
-          curl -L -o /tmp/iOSToolchain.tar.xz https://github.com/L1ghtmann/llvm-project/releases/latest/download/iOSToolchain.tar.xz
-          tar -xf /tmp/iOSToolchain.tar.xz -C "$HOME/theos/toolchain"
-          git clone --depth=1 https://github.com/theos/sdks.git /tmp/sdks
-          rm -rf "$HOME/theos/sdks" && mkdir -p "$HOME/theos/sdks"
-          mv /tmp/sdks/*.sdk "$HOME/theos/sdks/"
-          # armv7 needs an older SDK
-          cd "$HOME/theos/sdks" && rm -rf iPhoneOS1[3-9].* iPhoneOS2*.* || true
-          ls "$HOME/theos/sdks"
-          ls "$HOME/theos/toolchain"
-
-      - name: Build the app
-        run: |
-          export THEOS="$HOME/theos"
-          make package FINALPACKAGE=1
-
-      - name: Make the .ipa
-        run: |
-          APP=$(find .theos/_ -type d -name "Jellyfin.app" | head -n 1)
-          echo "Found app at: $APP"
-          test -f "$APP/Jellyfin" && test -f "$APP/index.html" && test -f "$APP/Info.plist"
-          ldid -S "$APP/Jellyfin"
-          rm -rf Payload Jellyfin.ipa
-          mkdir Payload
-          cp -r "$APP" Payload/
-          zip -qr Jellyfin.ipa Payload
-          ls -la Jellyfin.ipa
-
-      - name: Save the .ipa to the Releases page
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: build-${{ github.run_number }}
-          name: Jellyfin build ${{ github.run_number }}
-          files: Jellyfin.ipa
-
-      - name: Also keep it as a download on this run
-        uses: actions/upload-artifact@v4
-        with:
-          name: Jellyfin-ipa
-          path: Jellyfin.ipa
